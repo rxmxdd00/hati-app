@@ -1,9 +1,11 @@
+import csv
+import io
 from decimal import ROUND_DOWN, Decimal, InvalidOperation
 from html import escape
 from typing import TypedDict
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 CENT = Decimal("0.01")
 
@@ -75,6 +77,7 @@ def page(message: str = "") -> str:
 <body>
   <h1>Roommate expense splitter</h1>
   <p>Enter amounts in Philippine pesos. Shares are split equally, down to the cent.</p>
+  <p><a href="/expenses.csv">Download expenses as CSV</a></p>
   <p class="error">{escape(message)}</p>
   <form method="post" action="/expenses">
     <label>Description <input name="description" required maxlength="120"></label>
@@ -92,6 +95,27 @@ def page(message: str = "") -> str:
 @app.get("/", response_class=HTMLResponse)
 async def home():
     return page()
+
+
+@app.get("/expenses.csv")
+async def export_expenses():
+    output = io.StringIO(newline="")
+    writer = csv.writer(output)
+    writer.writerow(["description", "amount_php", "paid_by", "shared_by"])
+    for expense in expenses:
+        writer.writerow(
+            [
+                expense["description"],
+                f"{expense['amount']:.2f}",
+                expense["payer"],
+                "; ".join(expense["shares"]),
+            ]
+        )
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="expenses.csv"'},
+    )
 
 
 @app.post("/expenses")
