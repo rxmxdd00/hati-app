@@ -118,3 +118,23 @@ def test_csv_export_preserves_unicode_and_homepage_link():
 
     assert rows[1] == ["Kape at pagkain", "1.00", "José", "José; 李"]
     assert 'href="/expenses.csv"' in client.get("/").text
+
+
+def test_csv_export_neutralizes_formula_leading_text_fields():
+    expenses.append(
+        {
+            "description": "=HYPERLINK(\"https://example.com\")",
+            "amount": Decimal("1.00"),
+            "payer": "\t@SUM(A1:A2)",
+            "shares": ["=SUM(A1)", "Bea"],
+        }
+    )
+
+    rows = list(csv.reader(StringIO(client.get("/expenses.csv").text)))
+
+    assert rows[1] == [
+        "'=HYPERLINK(\"https://example.com\")",
+        "1.00",
+        "'\t@SUM(A1:A2)",
+        "'=SUM(A1); Bea",
+    ]

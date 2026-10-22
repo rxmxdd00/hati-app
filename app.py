@@ -10,6 +10,16 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 CENT = Decimal("0.01")
 
 
+def spreadsheet_safe_text(value: str) -> str:
+    first_significant = next(
+        (char for char in value if not char.isspace() and char.isprintable()),
+        "",
+    )
+    if first_significant in {"=", "+", "-", "@"}:
+        return f"'{value}"
+    return value
+
+
 class Expense(TypedDict):
     description: str
     amount: Decimal
@@ -105,10 +115,10 @@ async def export_expenses():
     for expense in expenses:
         writer.writerow(
             [
-                expense["description"],
+                spreadsheet_safe_text(expense["description"]),
                 f"{expense['amount']:.2f}",
-                expense["payer"],
-                "; ".join(expense["shares"]),
+                spreadsheet_safe_text(expense["payer"]),
+                "; ".join(spreadsheet_safe_text(person) for person in expense["shares"]),
             ]
         )
     return Response(
